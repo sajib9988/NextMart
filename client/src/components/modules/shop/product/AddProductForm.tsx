@@ -28,7 +28,7 @@ import { Plus } from "lucide-react";
 
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import Logo from "@/app/assets/svgs/Logo";
+import Logo from "@/assets/svgs/Logo";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getAllCategories } from "@/service/category";
 import { getAllBrands } from "@/service/brand";
