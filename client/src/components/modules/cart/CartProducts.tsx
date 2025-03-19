@@ -1,12 +1,14 @@
+"use client";
+
 import Image from "next/image";
 import emptyCart from "@/assets/empty-cart.png";
-
 import CartProductCard from "./CartProductCard";
+import { useAppSelector } from "@/redux/hook";
+import { CartProduct, orderedProductsSelector } from "@/redux/feature/CartSlice";
 
-import { getAllProducts } from "@/service/product";
-import { IProducts } from "@/type/products";
-export default async function CartProducts() {
-  const { data: products } = await getAllProducts();
+
+export default function CartProducts() {
+  const products = useAppSelector(orderedProductsSelector);
 
   return (
     <div className="border-2 border-white bg-background brightness-105 rounded-md col-span-8 h-full row-span-3 p-10 space-y-5">
@@ -22,7 +24,7 @@ export default async function CartProducts() {
           </div>
         </div>
       )}
-      {products.map((product: IProducts) => (
+      {products?.map((product: CartProduct) => (
         <CartProductCard key={product._id} product={product} />
       ))}
     </div>

@@ -35,4 +35,5 @@ type Specification = {
     createdAt: string;
     updatedAt: string;
     offerPrice: number;
+    
   }
