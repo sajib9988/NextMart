@@ -57,6 +57,7 @@ export default function PaymentDetails() {
 
       // Call API to create an order
       const res = await createOrder(order);
+      console.log(res);
 
       if (res?.success) {
         toast.success("Order placed successfully!");

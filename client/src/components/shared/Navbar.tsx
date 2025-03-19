@@ -1,7 +1,7 @@
 "use client";
 import Logo from "@/assets/svgs/Logo";
 import { Button } from "../ui/button";
-import { Heart, LogOut, ShoppingBag } from "lucide-react";
+import { Heart, LogOut, ShoppingBag, ShoppingCart } from "lucide-react";
 import Link from "next/link";
 import {
   DropdownMenu,
@@ -19,11 +19,14 @@ import { protectedRoutes } from "@/constant";
 import { logout } from "@/service/AuthService";
 
 
+import { useAppSelector } from "@/redux/hook";
+import { orderedProductsSelector } from "@/redux/feature/CartSlice";
+
 export default function Navbar() {
   const { user, setIsLoading } = useUser();
   const pathname = usePathname();
   const router = useRouter();
-
+  const products = useAppSelector(orderedProductsSelector);
   const handleLogOut = () => {
     logout();
     setIsLoading(true);
@@ -51,10 +54,17 @@ export default function Navbar() {
           <Button variant="outline" className="rounded-full p-0 size-10">
             <Heart />
           </Button>
-          <Button variant="outline" className="rounded-full p-0 size-10">
-            <ShoppingBag />
-          </Button>
-
+          <Link href="/cart" passHref>
+            <Button
+              variant="outline"
+              className="rounded-full size-10 flex items-center justify-center gap-1"
+            >
+              <ShoppingCart className="w-5 h-5" />
+              <span className="text-red-500 font-bold">
+                {products?.length ?? 0}
+              </span>
+            </Button>
+          </Link>
           {user?.email ? (
             <>
               <Link href="/create-shop">

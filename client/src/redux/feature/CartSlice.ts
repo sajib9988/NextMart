@@ -1,106 +1,152 @@
-import { createSlice } from "@reduxjs/toolkit";
+
+import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import { RootState } from "../store";
+
 import { IProducts } from "@/type/products";
+import { addCoupon } from "@/service/cart";
 
-// Defining the type for each product in the cart
 export interface CartProduct extends IProducts {
-  orderQuantity: number; // Tracks the quantity of the ordered product
+  orderQuantity: number;
 }
 
-// Defining the initial state of the cart
 interface InitialState {
-  products: CartProduct[]; // List of all products in the cart
-  city: string; // Name of the delivery city
-  shippingAddress: string; // Shipping address
+  products: CartProduct[];
+  city: string;
+  shippingAddress: string;
+  shopId: string;
+  coupon: {
+    code: string;
+    discountAmount: number;
+    isLoading: boolean;
+    error: string;
+  };
 }
 
-// Setting up the default state of the cart
 const initialState: InitialState = {
   products: [],
   city: "",
   shippingAddress: "",
+  shopId: "",
+  coupon: {
+    code: "",
+    discountAmount: 0,
+    isLoading: false,
+    error: "",
+  },
 };
 
-// Creating the Redux Slice for the cart
+export const fetchCoupon = createAsyncThunk(
+  "cart/fetchCoupon",
+  async ({
+    couponCode,
+    subTotal,
+    shopId,
+  }: {
+    couponCode: string;
+    subTotal: number;
+    shopId: string;
+  }) => {
+    try {
+      const res = await addCoupon(couponCode, subTotal, shopId);
+
+      if (!res.success) {
+        throw new Error(res.message);
+      }
+
+      return res;
+    } catch (err: any) {
+      console.log(err);
+      throw new Error(err.message);
+    }
+  }
+);
+
 const cartSlice = createSlice({
   name: "cart",
   initialState,
   reducers: {
-    // 🛒 Add a new product (if it exists, increase the quantity)
     addProduct: (state, action) => {
+      if (state.products.length === 0) {
+        state.shopId = action.payload.shop._id;
+      }
+
       const productToAdd = state.products.find(
         (product) => product._id === action.payload._id
       );
 
       if (productToAdd) {
-        productToAdd.orderQuantity += 1; // If the product exists, increase the quantity
+        productToAdd.orderQuantity += 1;
         return;
       }
 
-      state.products.push({ ...action.payload, orderQuantity: 1 }); // Add a new product to the cart
+      state.products.push({ ...action.payload, orderQuantity: 1 });
     },
-
-    // ➕ Increase the order quantity
     incrementOrderQuantity: (state, action) => {
       const productToIncrement = state.products.find(
         (product) => product._id === action.payload
       );
 
       if (productToIncrement) {
-        productToIncrement.orderQuantity += 1; // Increase quantity by 1
+        productToIncrement.orderQuantity += 1;
         return;
       }
     },
-
-    // ➖ Decrease the order quantity (at least 1 must remain)
     decrementOrderQuantity: (state, action) => {
       const productToIncrement = state.products.find(
         (product) => product._id === action.payload
       );
 
       if (productToIncrement && productToIncrement.orderQuantity > 1) {
-        productToIncrement.orderQuantity -= 1; // Decrease quantity by 1
+        productToIncrement.orderQuantity -= 1;
         return;
       }
     },
-
-    // ❌ Remove a product from the cart
     removeProduct: (state, action) => {
       state.products = state.products.filter(
         (product) => product._id !== action.payload
       );
     },
-
-    // 📍 Update the delivery city
     updateCity: (state, action) => {
       state.city = action.payload;
     },
-
-    // 📦 Update the shipping address
     updateShippingAddress: (state, action) => {
       state.shippingAddress = action.payload;
     },
-
-    // 🗑️ Clear the entire cart
     clearCart: (state) => {
       state.products = [];
       state.city = "";
       state.shippingAddress = "";
     },
   },
+  extraReducers: (builder) => {
+    builder.addCase(fetchCoupon.pending, (state) => {
+      state.coupon.isLoading = true;
+      state.coupon.error = "";
+    });
+    builder.addCase(fetchCoupon.rejected, (state, action) => {
+      state.coupon.isLoading = false;
+      state.coupon.error = action.error.message as string;
+      state.coupon.code = "";
+      state.coupon.discountAmount = 0;
+    });
+    builder.addCase(fetchCoupon.fulfilled, (state, action) => {
+      state.coupon.isLoading = false;
+      state.coupon.error = "";
+      state.coupon.code = action.payload.data.coupon.code;
+      state.coupon.discountAmount = action.payload.data.discountAmount;
+    });
+  },
 });
 
-//* Selectors
+//* Products
 
-// Get all ordered products
 export const orderedProductsSelector = (state: RootState) => {
   return state.cart.products;
 };
 
-// Get order details
 export const orderSelector = (state: RootState) => {
   return {
-    products: state.cart.products.map((product: CartProduct) => ({
+    products: state.cart.products.map((product) => ({
       product: product._id,
       quantity: product.orderQuantity,
       color: "White",
@@ -110,11 +156,14 @@ export const orderSelector = (state: RootState) => {
   };
 };
 
-//* Payment Calculation
+export const shopSelector = (state: RootState) => {
+  return state.cart.shopId;
+};
 
-// Calculate subtotal price
+//* Payment
+
 export const subTotalSelector = (state: RootState) => {
-  return state.cart.products.reduce((acc: number, product: CartProduct) => {
+  return state.cart.products.reduce((acc, product) => {
     if (product.offerPrice) {
       return acc + product.offerPrice * product.orderQuantity;
     } else {
@@ -123,38 +172,50 @@ export const subTotalSelector = (state: RootState) => {
   }, 0);
 };
 
-// Calculate shipping cost based on city
 export const shippingCostSelector = (state: RootState) => {
-  if (state.cart.city && state.cart.city === "Dhaka" && state.cart.products.length > 0) {
+  if (
+    state.cart.city &&
+    state.cart.city === "Dhaka" &&
+    state.cart.products.length > 0
+  ) {
     return 60;
-  } else if (state.cart.city && state.cart.city !== "Dhaka" && state.cart.products.length > 0) {
+  } else if (
+    state.cart.city &&
+    state.cart.city !== "Dhaka" &&
+    state.cart.products.length > 0
+  ) {
     return 120;
   } else {
     return 0;
   }
 };
 
-// Calculate grand total (subtotal + shipping cost)
 export const grandTotalSelector = (state: RootState) => {
   const subTotal = subTotalSelector(state);
   const shippingCost = shippingCostSelector(state);
+  const discountAmount = discountAmountSelector(state);
 
-  return subTotal + shippingCost;
+  return subTotal - discountAmount + shippingCost;
 };
 
-//* Address Selectors
+export const couponSelector = (state: RootState) => {
+  return state.cart.coupon;
+};
 
-// Get selected city
+export const discountAmountSelector = (state: RootState) => {
+  return state.cart.coupon.discountAmount;
+};
+
+//* Address
+
 export const citySelector = (state: RootState) => {
   return state.cart.city;
 };
 
-// Get shipping address
 export const shippingAddressSelector = (state: RootState) => {
   return state.cart.shippingAddress;
 };
 
-// Exporting all actions from the cart slice
 export const {
   addProduct,
   incrementOrderQuantity,
@@ -164,5 +225,4 @@ export const {
   updateShippingAddress,
   clearCart,
 } = cartSlice.actions;
-
 export default cartSlice.reducer;
